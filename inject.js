@@ -115,19 +115,21 @@
     '}',
     '#we-bg-panel .we-item .we-preview-btn:hover { background: rgba(255,255,255,0.18); }',
     // Control rows.
-    '#we-bg-speed, #we-bg-font {',
+    '#we-bg-speed, #we-bg-font, #we-bg-refresh {',
     '  display: flex; align-items: center; justify-content: space-between; gap: 8px;',
     '  padding: 6px 10px; margin-bottom: 4px;',
     '  border-bottom: 1px solid rgba(255,255,255,0.12);',
     '  font: 12px/1.4 system-ui, "Segoe UI", sans-serif; color: #aab0c0;',
     '}',
-    '#we-bg-speed button {',
+    '#we-bg-speed button, #we-bg-refresh button {',
     '  border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;',
     '  background: rgba(255,255,255,0.08); color: #e6e8ee;',
     '  font: 12px/1.4 system-ui, "Segoe UI", sans-serif;',
     '  padding: 2px 8px; cursor: pointer;',
     '}',
-    '#we-bg-speed button:hover, #we-bg-font button:hover { background: rgba(255,255,255,0.16); }',
+    '#we-bg-speed button:hover, #we-bg-font button:hover, #we-bg-refresh button:hover { background: rgba(255,255,255,0.16); }',
+    '#we-bg-refresh button:disabled { opacity: 0.6; cursor: default; }',
+    '#we-bg-refresh .we-refresh-ok { color: #8ee6b0; }',
     '#we-bg-speed .we-speed-val { font-weight: 600; color: #e6e8ee; }',
     '#we-bg-font .we-font-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }',
     '#we-bg-font .we-swatch {',
@@ -517,6 +519,22 @@
     speedRow.appendChild(speedBtn);
     panel.appendChild(speedRow);
 
+    // Wallpaper list refresh row: re-scan the workshop folder without
+    // reloading the page (new Steam subscriptions show up here).
+    var refreshRow = document.createElement('div');
+    refreshRow.id = 'we-bg-refresh';
+    var refreshLabel = document.createElement('span');
+    refreshLabel.textContent = '壁纸列表';
+    var refreshBtn = document.createElement('button');
+    refreshBtn.type = 'button';
+    refreshBtn.className = 'we-refresh-btn';
+    refreshBtn.textContent = '刷新';
+    refreshBtn.title = '重新扫描壁纸文件夹（新增订阅后点这里）';
+    refreshBtn.addEventListener('click', refreshCatalog);
+    refreshRow.appendChild(refreshLabel);
+    refreshRow.appendChild(refreshBtn);
+    panel.appendChild(refreshRow);
+
     // Font color row.
     var fontRow = document.createElement('div');
     fontRow.id = 'we-bg-font';
@@ -581,8 +599,18 @@
     panel.appendChild(shadowRow);
 
     // Wallpaper grid: two large preview tiles per row.
-    var itemsWrap = document.createElement('div');
-    itemsWrap.className = 'we-items';
+    renderItems();
+  }
+
+  // (Re)build only the wallpaper grid, leaving the control rows intact.
+  function renderItems() {
+    var wrap = panel.querySelector('.we-items');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'we-items';
+      panel.appendChild(wrap);
+    }
+    wrap.innerHTML = '';
     state.list.forEach(function (w) {
       var item = document.createElement('div');
       item.className = 'we-item' + (w.id === (state.list[state.index] && state.list[state.index].id) ? ' active' : '');
@@ -630,9 +658,42 @@
       item.addEventListener('click', function () {
         pick(w.id);
       });
-      itemsWrap.appendChild(item);
+      wrap.appendChild(item);
     });
-    panel.appendChild(itemsWrap);
+  }
+
+  // Re-scan the workshop folder: keep the current wallpaper if it still
+  // exists, otherwise fall back to the first one.
+  function refreshCatalog() {
+    var btn = panel.querySelector('#we-bg-refresh .we-refresh-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '刷新中…'; }
+    fetch(API + '/api/wallpapers')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var prevId = state.list[state.index] && state.list[state.index].id;
+        state.list = (data && data.wallpapers) || [];
+        var idx = -1;
+        if (prevId) {
+          for (var i = 0; i < state.list.length; i++) {
+            if (state.list[i].id === prevId) { idx = i; break; }
+          }
+        }
+        state.index = idx >= 0 ? idx : (state.list.length ? 0 : -1);
+        renderItems();
+        if (state.index >= 0) apply();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '✓ 已刷新';
+          btn.classList.add('we-refresh-ok');
+          setTimeout(function () {
+            if (btn) { btn.textContent = '刷新'; btn.classList.remove('we-refresh-ok'); }
+          }, 1500);
+        }
+      })
+      .catch(function (err) {
+        console.warn('[we-wallpaper] refresh failed:', err);
+        if (btn) { btn.disabled = false; btn.textContent = '刷新失败'; }
+      });
   }
 
   function shuffle() {
