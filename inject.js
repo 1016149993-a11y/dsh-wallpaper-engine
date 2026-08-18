@@ -43,7 +43,13 @@
     '--dsw-alias-bg-mask-2',
     '--dsw-alias-bg-mask-3',
     '--dsw-alias-bg-mask-drop',
-    '--dsw-alias-bg-mask-photo'
+    '--dsw-alias-bg-mask-photo',
+    '--dsw-specific-sidebar-fill',
+    '--dsw-specific-menu',
+    '--dsw-specific-selector',
+    '--dsw-specific-tip',
+    '--dsw-specific-bubble',
+    '--dsw-linear-gradient-think'
   ];
 
   if (window.__weWallpaperLoaded) return;
@@ -232,14 +238,16 @@
         try { cs = getComputedStyle(el); } catch (e) { return; }
         var bg = cs.backgroundColor;
         var hasBg = bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+        var img = cs.backgroundImage;
+        var hasImg = img && img !== 'none';
         var filter = cs.backdropFilter || cs.webkitBackdropFilter;
         var hasFilter = filter && filter !== 'none';
-        if (hasBg || hasFilter) {
+        if (hasBg || hasImg || hasFilter) {
           var rect = el.getBoundingClientRect();
           // Clear wide surfaces and full-width strips (toolbars, dividers,
           // overlays) while keeping small controls legible.
           if (rect.width > 120 && rect.height > 16) {
-            if (hasBg) {
+            if (hasBg || hasImg) {
               el.style.background = 'transparent';
               el.style.backgroundColor = 'transparent';
               el.style.backgroundImage = 'none';
