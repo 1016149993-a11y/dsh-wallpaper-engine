@@ -639,7 +639,8 @@
       item.dataset.id = w.id;
       item.title = w.title; // title only as a hover tooltip
 
-      // Large preview thumbnail: preview.jpg when the workshop item ships one.
+      // Large preview thumbnail: preview.jpg when the workshop item ships one;
+      // otherwise use the video's own first frame as the thumbnail.
       var thumb = document.createElement('span');
       thumb.className = 'we-thumb';
       if (w.preview) {
@@ -654,7 +655,23 @@
         });
         thumb.appendChild(img);
       } else {
-        thumb.textContent = '🎞';
+        // No preview.jpg: render the first frame of the actual video.
+        // preload="metadata" fetches only the header (HTTP Range), so even
+        // multi-GB files stay cheap.
+        var vid = document.createElement('video');
+        vid.muted = true;
+        vid.playsInline = true;
+        vid.preload = 'metadata';
+        vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        vid.src = API + '/media/' + encodeURIComponent(w.id) + '/' + encodeURIComponent(w.file);
+        vid.addEventListener('loadedmetadata', function () {
+          try { vid.currentTime = 0.1; } catch (e) {}
+        });
+        vid.addEventListener('error', function () {
+          vid.style.display = 'none';
+          thumb.textContent = '🎞';
+        });
+        thumb.appendChild(vid);
       }
       item.appendChild(thumb);
 
