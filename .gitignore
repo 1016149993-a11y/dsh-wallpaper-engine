@@ -1,0 +1,8 @@
+# Personal / scratch — never publish
+_cdp-speed/
+_*.js
+index.html.original.bak
+
+# Runtime
+node_modules/
+*.log
