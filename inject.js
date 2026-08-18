@@ -38,7 +38,12 @@
     '--dsw-alias-bg-module-platform',
     '--dsw-alias-bg-overlay',
     '--dsw-alias-bg-multi-select',
-    '--dsw-alias-bg-skeleton'
+    '--dsw-alias-bg-skeleton',
+    '--dsw-alias-bg-mask-1',
+    '--dsw-alias-bg-mask-2',
+    '--dsw-alias-bg-mask-3',
+    '--dsw-alias-bg-mask-drop',
+    '--dsw-alias-bg-mask-photo'
   ];
 
   if (window.__weWallpaperLoaded) return;
@@ -210,35 +215,44 @@
     // Make the app shell background fully transparent so the wallpaper shows
     // through completely. DSH's main frame and inner surface containers paint
     // opaque backgrounds (--dsw-alias-bg-base / --dsw-specific-sidebar-fill
-    // and layer tokens); we locate them through the stable [data-slot="root"]
-    // slot marker and clear large surfaces.
+    // and layer tokens); several masks/overlays also carry a backdrop-filter
+    // (frosted-glass blur) and translucent fills (--dsw-alias-bg-mask-*,
+    // #0000003d) that must be cleared too, or a blurred "band" stays visible
+    // across the wallpaper.
+    function isOurs(el) {
+      return !!(el.id && el.id.indexOf('we-') === 0);
+    }
     function neutralizeFrames() {
-      var root = document.getElementById('root');
-      if (!root) return;
-      var slotRoot = root.querySelector('[data-slot="root"]');
-      var frame = slotRoot && slotRoot.firstElementChild
-        ? slotRoot.firstElementChild
-        : (root.children.length ? root.children[0] : null);
-      if (!frame) return;
-      // The app frame itself: fully transparent so the video is the page bg.
-      frame.style.background = 'transparent';
-      frame.style.backgroundColor = 'transparent';
-      // Inner surface containers (sidebar, conversation, workspace columns):
-      // fully transparent too — the font-color control keeps text readable.
+      // Walk the whole <body> rather than only the app frame: mask / overlay
+      // layers can be rendered as siblings of the shell (portals) and are
+      // exactly the translucent strips users still see.
       var walk = function (el, depth) {
-        if (!el || depth > 6) return;
-        var cs = getComputedStyle(el);
+        if (!el || depth > 10 || isOurs(el)) return;
+        var cs;
+        try { cs = getComputedStyle(el); } catch (e) { return; }
         var bg = cs.backgroundColor;
-        if (bg && bg !== 'rgba(0, 0, 0, 0)') {
+        var hasBg = bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+        var filter = cs.backdropFilter || cs.webkitBackdropFilter;
+        var hasFilter = filter && filter !== 'none';
+        if (hasBg || hasFilter) {
           var rect = el.getBoundingClientRect();
-          if (rect.width > 120 && rect.height > 80) {
-            el.style.background = 'transparent';
-            el.style.backgroundColor = 'transparent';
+          // Clear wide surfaces and full-width strips (toolbars, dividers,
+          // overlays) while keeping small controls legible.
+          if (rect.width > 120 && rect.height > 16) {
+            if (hasBg) {
+              el.style.background = 'transparent';
+              el.style.backgroundColor = 'transparent';
+              el.style.backgroundImage = 'none';
+            }
+            if (hasFilter) {
+              el.style.backdropFilter = 'none';
+              el.style.webkitBackdropFilter = 'none';
+            }
           }
         }
         for (var i = 0; i < el.children.length; i++) walk(el.children[i], depth + 1);
       };
-      for (var i = 0; i < frame.children.length; i++) walk(frame.children[i], 0);
+      walk(document.body, 0);
     }
     neutralizeFrames();
     if (typeof MutationObserver !== 'undefined') {
